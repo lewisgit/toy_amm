@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
 use near_sdk::json_types::{U128};
-use near_sdk::{env, Gas, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseOrValue};
+use near_sdk::{env, log, Gas, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseOrValue};
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 
 mod ft_core;
@@ -73,10 +73,21 @@ impl ToyAMM {
     }
   }
 
+  pub fn get_user_deposit0(&self, user: AccountId) -> U128{
+    let deposit0 = self.deposit0.get(&user).unwrap_or(0);
+    deposit0.into()
+  }
+
+  pub fn get_user_deposit1(&self, user: AccountId) -> U128{
+    let deposit1 = self.deposit1.get(&user).unwrap_or(0);
+    deposit1.into()
+  }
+
+
   fn remove_deposit(&mut self, account_id: &AccountId, token: &AccountId, amount: u128) {
     let deposit = self.get_deposit(&token);
     let balance = deposit.get(account_id).unwrap_or(0);
-    assert!(balance >= amount, "ToyAMM: INSUFFICIENT_DEPOSIT");
+    assert!(balance >= amount, "ToyAMM: INSUFFICIENT_DEPOSIT. account: {}, token: {}, balance: {}, amount: {}", account_id, token, balance, amount);
     deposit.insert(&account_id.clone(), &(balance - amount));
   }
   
@@ -110,7 +121,6 @@ impl ToyAMM {
     let reserve_out = self.reserves.get(&token_out).unwrap();
     
     let amount_out = get_amount_out(amount_in.0, reserve_in, reserve_out);
-    println!("amount_out: {}", amount_out);
 
     let user = env::predecessor_account_id();
     
@@ -143,7 +153,10 @@ impl ToyAMM {
     assert!(balance >= amount, "ToyAMM: INSUFFICIENT_DEPOSIT");
     deposit.insert(token_id, &(balance-amount));
 
+    log!("withdraw to: {}, token: {}, amount: {}", to, token_id, amount);
+
     ext_ft_core::ext(token_id.clone())
+      .with_attached_deposit(1)
       .with_static_gas(Gas(5*TGAS.0))
       .ft_transfer(to.clone(), amount.into(), None);
 
@@ -161,6 +174,8 @@ impl FungibleTokenReceiver for ToyAMM {
     msg: String
   ) -> PromiseOrValue<U128> {
     let token_id= env::predecessor_account_id();
+
+    log!("token_id: {} sender_id: {} amount: {}",token_id, sender_id, amount.0);
 
     self.deposit_token(&sender_id, &token_id, amount.0);
 

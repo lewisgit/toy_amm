@@ -1,30 +1,43 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
 use near_sdk::json_types::{U128};
-use near_sdk::{env, log, Gas, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseOrValue};
+use near_sdk::{env, log, near_bindgen, AccountId, Balance, PanicOnDefault, PromiseOrValue};
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 
 mod ft_core;
 mod constants;
 mod utils;
+mod internal;
 
-use crate::ft_core::*;
 use crate::utils::*;
-use crate::constants::*;
+
+/**
+ * ToyAMM demostrate a simple AMM of 2 tokens
+ * In this contract, only the owner of the contract can add liquidity
+ * users can swap token for another token
+ * users cannot set the minimum amount of token to receive
+ */
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct ToyAMM{
+
+  // owner of this contract
   pub owner: AccountId,
 
+  // token0 of this AMM
   pub token0: AccountId,
 
+  // token1 of this AMM
   pub token1: AccountId,
-    
-  pub reserves: LookupMap<AccountId, u128>,
 
+  // token reserves of token0 and token1
+  pub reserves: LookupMap<AccountId, Balance>,
+
+  // store users' deposit on token0
   pub deposit0: LookupMap<AccountId, Balance>,
 
+  // store users' deposit on token1
   pub deposit1: LookupMap<AccountId, Balance>,
 
 }
@@ -39,8 +52,8 @@ impl ToyAMM {
     assert!(!env::state_exists(), "ToyAMM: ALREADY_INITIALIZED");
 
     let mut reserves = LookupMap::new(b"r".to_vec());
-    reserves.insert(&token0.clone(), &0u128);
-    reserves.insert(&token1.clone(), &0u128);
+    reserves.insert(&token0, &0u128);
+    reserves.insert(&token1, &0u128);
 
     Self {
       owner,
@@ -51,52 +64,30 @@ impl ToyAMM {
       deposit1: LookupMap::new(b"d1".to_vec()),
     }
   }
-  #[inline]
-  pub fn assert_liquidity(&self) {
-    let (reserve0, reserve1) = self.get_reserves();
-    assert!(reserve0 > 0 && reserve1 > 0, "ToyAMM: INSUFFICIENT_LIQUIDITY");
-  }
 
-  #[inline]
-  pub fn assert_owner(&self) {
-    assert!(env::predecessor_account_id() == self.owner, "ToyAMM: ONLY_OWNER_ALLOWED");
-  }
-
-  #[inline]
-  fn get_deposit(&mut self, token_id: &AccountId) -> &mut LookupMap<AccountId, Balance>{
-    if token_id == &self.token0 {
-      &mut self.deposit0
-    } else if token_id == &self.token1 {
-      &mut self.deposit1
+  /**
+   * get user deposit on token
+   */ 
+  pub fn get_user_deposit(&self, token: AccountId, user: AccountId) -> U128{
+    if token == self.token0 {
+      U128(self.deposit0.get(&user).unwrap_or(0))
+    } else if token == self.token1 {
+      U128(self.deposit1.get(&user).unwrap_or(0))
     } else {
       panic!("ToyAMM: INVALID_TOKEN_ID");
     }
   }
 
-  pub fn get_user_deposit0(&self, user: AccountId) -> U128{
-    let deposit0 = self.deposit0.get(&user).unwrap_or(0);
-    deposit0.into()
-  }
-
-  pub fn get_user_deposit1(&self, user: AccountId) -> U128{
-    let deposit1 = self.deposit1.get(&user).unwrap_or(0);
-    deposit1.into()
-  }
-
-
-  fn remove_deposit(&mut self, account_id: &AccountId, token: &AccountId, amount: u128) {
-    let deposit = self.get_deposit(&token);
-    let balance = deposit.get(account_id).unwrap_or(0);
-    assert!(balance >= amount, "ToyAMM: INSUFFICIENT_DEPOSIT. account: {}, token: {}, balance: {}, amount: {}", account_id, token, balance, amount);
-    deposit.insert(&account_id.clone(), &(balance - amount));
+  pub fn get_reserves(&self) -> (U128, U128) {
+    (self.reserves.get(&self.token0).unwrap().into(), self.reserves.get(&self.token1).unwrap().into())
   }
   
   /**
-   * ToyAMM requires only owner of the contract
+   * only owner can add liquidity for ToyAMM
    * currently there is no reward to liquidity providers
    */
   pub fn add_liquidity(&mut self, token0_account: AccountId, amount0_in: U128, token1_account: AccountId, amount1_in: U128) {
-    self.assert_owner();
+    self.assert_owner(&env::predecessor_account_id());
 
     self.remove_deposit(&env::predecessor_account_id(), &token0_account, amount0_in.into());
     self.remove_deposit(&env::predecessor_account_id(), &token1_account, amount1_in.into());
@@ -106,12 +97,11 @@ impl ToyAMM {
     self.reserves.insert(&token0_account, &reserve0_new);
     self.reserves.insert(&token1_account, &reserve1_new);
   }
-
-  pub fn get_reserves(&self) -> (u128, u128) {
-    (self.reserves.get(&self.token0).unwrap(), self.reserves.get(&self.token1).unwrap())
-  }
    
-  // swap token
+  /**
+   * swap for token
+   * before swap, user should have enough deposit greater than amount
+   */ 
   #[payable]
   pub fn swap_for_token(&mut self, token_in: AccountId, token_out: AccountId, amount_in: U128) -> U128 {
     
@@ -134,38 +124,14 @@ impl ToyAMM {
     amount_out.into()
   }
 
-  pub fn update(&mut self, token0: &AccountId, token1: &AccountId, reserve0: &u128, reserve1: &u128) {
-    self.reserves.insert(token0, reserve0);
-    self.reserves.insert(token1, reserve1);
-  }
-
-  #[private]
-  fn deposit_token(&mut self, sender_id: &AccountId, token_id: &AccountId, amount: u128) {
-    let deposit = self.get_deposit(token_id);
-    let balance = deposit.get(sender_id).unwrap_or(0);
-    deposit.insert(&sender_id, &(balance+amount));
-  }
-
-  #[private]
-  fn withdraw_token(&mut self, to: &AccountId, token_id: &AccountId, amount: u128) {
-    let deposit = self.get_deposit(token_id);
-    let balance = deposit.get(to).unwrap_or(0);
-    assert!(balance >= amount, "ToyAMM: INSUFFICIENT_DEPOSIT");
-    deposit.insert(token_id, &(balance-amount));
-
-    log!("withdraw to: {}, token: {}, amount: {}", to, token_id, amount);
-
-    ext_ft_core::ext(token_id.clone())
-      .with_attached_deposit(1)
-      .with_static_gas(Gas(5*TGAS.0))
-      .ft_transfer(to.clone(), amount.into(), None);
-
-  }
 }
 
 #[near_bindgen]
 impl FungibleTokenReceiver for ToyAMM {
 
+  /**
+   * add user transfer tokens to deposit
+   */
   #[allow(unused_variables)]
   fn ft_on_transfer(
     &mut self,
@@ -175,7 +141,8 @@ impl FungibleTokenReceiver for ToyAMM {
   ) -> PromiseOrValue<U128> {
     let token_id= env::predecessor_account_id();
 
-    log!("token_id: {} sender_id: {} amount: {}",token_id, sender_id, amount.0);
+    log!("ToyAMM: transfer receiver. token_id: {} sender_id: {} amount: {}",
+        token_id, sender_id, amount.0);
 
     self.deposit_token(&sender_id, &token_id, amount.0);
 
@@ -240,8 +207,8 @@ mod tests {
         (300 * NDENOM).into(),
       );
       let (reserve0, reserve1) = c.get_reserves();
-      assert_eq!(reserve0, 100*NDENOM, "reserve0 should be equal to amount0_in");
-      assert_eq!(reserve1, 300*NDENOM, "reserve1 should be equal to amount1_in");
+      assert_eq!(reserve0.0, 100*NDENOM, "reserve0 should be equal to amount0_in");
+      assert_eq!(reserve1.0, 300*NDENOM, "reserve1 should be equal to amount1_in");
   }
 
   #[test]
@@ -261,7 +228,7 @@ mod tests {
       );
       let amount_in = 1*NDENOM;
       let (reserve0, reserve1) = c.get_reserves();
-      println!("reserve0: {}, reserve1: {}", reserve0, reserve1);
+      println!("reserve0: {}, reserve1: {}", reserve0.0, reserve1.0);
       c.deposit_token(&user, &token0, amount_in.into());
       let amount_out = c.swap_for_token(token0, token1, amount_in.into());
   }
@@ -297,11 +264,11 @@ mod tests {
 
       let amount_in = 1*NDENOM;
       let (reserve0, reserve1) = c.get_reserves();
-      println!("reserve0: {}, reserve1: {}", reserve0, reserve1);
+      println!("reserve0: {}, reserve1: {}", reserve0.0, reserve1.0);
       c.deposit_token(&user, &token0, amount_in.into());
       let amount_out = c.swap_for_token(token0, token1, amount_in.into());
       let (new_reserve0, new_reserve1) = c.get_reserves();
-      assert!(amount_out.0 + new_reserve1 == reserve1, "reserve1 does not match");
-      assert!(new_reserve0 - amount_in == reserve0, "reserve0 does not match");
+      assert!(amount_out.0 + new_reserve1.0 == reserve1.0, "reserve1 does not match");
+      assert!(new_reserve0.0 - amount_in == reserve0.0, "reserve0 does not match");
   }
 }

@@ -14,3 +14,11 @@ near-contract-standards = "4.1.1"
 uint = { version = "0.9.5", default-features = false }
 
 [profile.release]
+codegen-units = 1
+# s = optimize for binary size ("z" would additionally turn off loop vectorization)
+opt-level = "s"
+# link time optimization
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true

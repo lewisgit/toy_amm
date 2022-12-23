@@ -3,7 +3,7 @@ use serde_json::json;
 use workspaces::{network::Sandbox, Account, Contract, Worker};
 
 const AMM_WASM_FILEPATH: &str = "../../amm/release/toy_amm.wasm";
-const FT_WASM_FILEPATH: &str = "../../FT/res/fungible_token.wasm";
+const FT_WASM_FILEPATH: &str = "../../FT/res/fungible_token.wasm"; 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -181,11 +181,12 @@ async fn main() -> anyhow::Result<()> {
         .gas(parse_gas!("200 Tgas") as u64)
         .transact()
         .await?
-        .into_result();
+        .into_result()?;
 
     let deposit0: String = worker
-    .view(amm_contract.id(), "get_user_deposit0")
+    .view(amm_contract.id(), "get_user_deposit")
     .args_json(serde_json::json!({
+        "token": ft0_contract.id(),
         "user": owner.id(),
     }))
     .await?.json()?;
@@ -217,7 +218,7 @@ async fn main() -> anyhow::Result<()> {
         .gas(parse_gas!("200 Tgas") as u64)
         .transact()
         .await?
-        .into_result();
+        .into_result()?;
 
     println!("alice call amm: swap_for_token ");
 

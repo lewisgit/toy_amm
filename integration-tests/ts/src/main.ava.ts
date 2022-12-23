@@ -62,8 +62,7 @@ test.before(async t => {
       }
   });
 
-  console.log("Deployed FT0 and FT1.");
-  console.log(ft0, ft1);
+  console.log("FT0 and FT1 Deployed.");
 
   console.log("deploying AMM");
   const amm = await root.devDeploy(AMM_WASM_FILEPATH, {
@@ -78,8 +77,7 @@ test.before(async t => {
       token1: ft1,
     }
   );
-  console.log("Deployed AMM");
-  console.log(amm);
+  console.log("AMM Deployed");
 
   console.log("creating Alice");
   const alice = await root.createSubAccount('ali', {
@@ -118,8 +116,8 @@ test.before(async t => {
   let balance_ft0 = await ft_balance_of(ft0, alice);
   let balance_ft1 = await ft_balance_of(ft1, alice);
 
-  console.log("alice ft0 balance: ", balance_ft0);
-  console.log("alice ft1 balance: ", balance_ft1);
+  console.log("alice ft0 balance: ", balance_ft0.toString());
+  console.log("alice ft1 balance: ", balance_ft1.toString());
 
   t.context.worker = worker;
   t.context.accounts = {root, ft0, ft1, amm, alice};

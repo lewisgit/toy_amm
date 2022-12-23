@@ -150,12 +150,14 @@ In the root directory of this project, run:
 cd integration-tests/rs
 cargo run --example integration-tests
 ```
-## Rust Integration Test
+## TS Integration Test
 In the root directory of this project, run:
 ```shell
 cd integration-tests/ts
+yarn install
 yarn test
 ```
+running TS Integration Test using node v18.12.0 will fail. (ref:https://github.com/near/workspaces-js/issues/168)
 integration tests will test cross contract call and add_liquidity funtion and swap_for_token function.
 
 # TODO

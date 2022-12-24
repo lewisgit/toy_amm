@@ -4,7 +4,7 @@ This project introduces a demonstration of a simple Automated Market Making (AMM
 To use ToyAMM, please follow the instructions provided in this document.
 
 # About Store Fungbile Token Metadata
-After some considerations, I don't think it is necessary to store FT's metadata, because we can retrieve metadata simply by call `ft_metadata` of the FT contract. I think it is not a good idea to do cross-contract call in init function. And a little bit redundant to call another function to store metadata. Additionally, AMM only cares about its reserves in u128, exchange formula doesn't involve decimals. Decimals, ticker, and symbols are irrelevant information. So to keep the contract clear and simple, I didn't implement functions for getting Fungible Token's metadata on my ToyAMM.
+I implement the version that stores token metadata on the branch `metadata`. After some considerations, I don't think it is necessary to store FT's metadata, because we can retrieve metadata simply by call `ft_metadata` of the FT contract. Additionally, AMM only cares about its reserves in u128, exchange formula doesn't involve decimals. Decimals, ticker, and symbols are irrelevant information. So to keep the contract clear and simple, I didn't implement on branch main, but you can check another version on branch `metadata`.
 
 # Prerequisite
 ## Environment Setup
@@ -103,6 +103,35 @@ without calling `ft_transfer_call` on both tokens, `add_liquidity` will fail to 
 near call $AMM add_liquidity '{"token0_account": "'$FT0'","amount0_in": "30000", "token1_account": "'$FT1'", "amount1_in": "70000"}' --accountId $OWNER 
 ```
 after running `add_liquidity`, ToyAMM can be used for token exchange.
+
+## Get Metadata
+By running:
+```shell
+near view $AMM get_metadata
+```
+you can get the metadata of the two Fungible Tokens. An example output should be like:
+```shell
+[
+  {
+    spec: 'ft-1.0.0',
+    name: 'Example NEAR fungible token',
+    symbol: 'EXAMPLE',
+    icon: null,
+    reference: null,
+    reference_hash: null,
+    decimals: 24
+  },
+  {
+    spec: 'ft-1.0.0',
+    name: 'Example NEAR fungible token',
+    symbol: 'EXAMPLE',
+    icon: null,
+    reference: null,
+    reference_hash: null,
+    decimals: 24
+  }
+]
+```
 
 ## Token Swap
 1. create an user Alice:

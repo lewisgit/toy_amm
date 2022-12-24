@@ -3,7 +3,7 @@ This project introduces a demonstration of a simple Automated Market Making (AMM
 
 To use ToyAMM, please follow the instructions provided in this document.
 
-# About Store Fungbile Token Metadata
+# About Storing Fungbile Token Metadata
 After some considerations, I don't think it is necessary to store FT's metadata, because we can retrieve metadata simply by call `ft_metadata` of the FT contract. I think it is not a good idea to do cross-contract call in init function. And a little bit redundant to call another function to store metadata. Additionally, AMM only cares about its reserves in u128, exchange formula doesn't involve decimals. Decimals, ticker, and symbols are irrelevant information. So to keep the contract clear and simple, I didn't implement functions for getting Fungible Token's metadata on my ToyAMM.
 
 # Prerequisite

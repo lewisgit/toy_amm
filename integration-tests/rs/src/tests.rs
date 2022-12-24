@@ -65,7 +65,7 @@ async fn main() -> anyhow::Result<()> {
         .into_result()?;
 
     // initialize amm contract
-    amm_contract
+    let init_amm = amm_contract
         .call("new")
         .args_json(serde_json::json!({
             "owner": owner.id(),
@@ -73,8 +73,8 @@ async fn main() -> anyhow::Result<()> {
             "token1": ft1_contract.id(),
         }))
         .transact()
-        .await?
-        .into_result()?;
+        .await?;
+    println!("init_amm: {:?}", init_amm.logs());
     
     // register ft accounts for AMM contract
     println!("owner call ft0: storage_deposit to amm");

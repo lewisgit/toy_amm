@@ -85,6 +85,7 @@ impl ToyAMM {
         Self::ext(env::current_account_id())
           .metadata(&mut meta1)
       );
+    log!("meta0: {}, meta1: {}", meta0.decimals, meta1.decimals);
 
     Self {
       owner,

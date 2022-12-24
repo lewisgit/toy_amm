@@ -1,3 +1,4 @@
+use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata, ext_ft_metadata, FT_METADATA_SPEC};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap};
 use near_sdk::json_types::{U128};
@@ -31,6 +32,12 @@ pub struct ToyAMM{
   // token1 of this AMM
   pub token1: AccountId,
 
+  // token0's metadata
+  pub meta0: FungibleTokenMetadata,
+
+  // token1's metadata
+  pub meta1: FungibleTokenMetadata,
+
   // token reserves of token0 and token1
   pub reserves: LookupMap<AccountId, Balance>,
 
@@ -55,14 +62,52 @@ impl ToyAMM {
     reserves.insert(&token0, &0u128);
     reserves.insert(&token1, &0u128);
 
+    let mut meta0: FungibleTokenMetadata = FungibleTokenMetadata {
+                spec: FT_METADATA_SPEC.to_string(),
+                name: "Example NEAR fungible token".to_string(),
+                symbol: "EXAMPLE".to_string(),
+                icon: None,
+                reference: None,
+                reference_hash: None,
+                decimals: 24,
+    };
+    let mut meta1: FungibleTokenMetadata = meta0.clone();
+    ext_ft_metadata::ext(token0.clone())
+      .ft_metadata()
+      .then(
+        Self::ext(env::current_account_id())
+          .metadata(&mut meta0)
+      );
+
+    ext_ft_metadata::ext(token1.clone())
+      .ft_metadata()
+      .then(
+        Self::ext(env::current_account_id())
+          .metadata(&mut meta1)
+      );
+
     Self {
       owner,
       token0,
       token1,
+      meta0,
+      meta1,
       reserves,
       deposit0: LookupMap::new(b"d0".to_vec()),
       deposit1: LookupMap::new(b"d1".to_vec()),
     }
+  }
+
+  #[private]
+  pub fn metadata(&self, meta: &mut FungibleTokenMetadata, #[callback] token_meta: FungibleTokenMetadata) {
+     *meta = token_meta;
+  }
+
+  /**
+   * get token metadata
+   */
+  pub fn get_metadata(&self) -> (FungibleTokenMetadata, FungibleTokenMetadata) {
+    (self.meta0.clone(), self.meta1.clone())
   }
 
   /**

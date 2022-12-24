@@ -72,6 +72,7 @@ async fn main() -> anyhow::Result<()> {
             "token0": ft0_contract.id(),
             "token1": ft1_contract.id(),
         }))
+        .gas(parse_gas!("300 Tgas") as u64)
         .transact()
         .await?;
     println!("init_amm: {:?}", init_amm.logs());

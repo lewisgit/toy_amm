@@ -62,7 +62,7 @@ impl ToyAMM {
     reserves.insert(&token0, &0u128);
     reserves.insert(&token1, &0u128);
 
-    let mut meta0: FungibleTokenMetadata = FungibleTokenMetadata {
+    let meta0: FungibleTokenMetadata = FungibleTokenMetadata {
                 spec: FT_METADATA_SPEC.to_string(),
                 name: "Example NEAR fungible token".to_string(),
                 symbol: "EXAMPLE".to_string(),
@@ -71,19 +71,23 @@ impl ToyAMM {
                 reference_hash: None,
                 decimals: 24,
     };
-    let mut meta1: FungibleTokenMetadata = meta0.clone();
+    let meta1: FungibleTokenMetadata = meta0.clone();
     ext_ft_metadata::ext(token0.clone())
+      .with_unused_gas_weight(1)
       .ft_metadata()
       .then(
         Self::ext(env::current_account_id())
-          .metadata(&mut meta0)
+          .with_unused_gas_weight(1)
+          .metadata(0)
       );
 
     ext_ft_metadata::ext(token1.clone())
+      .with_unused_gas_weight(1)
       .ft_metadata()
       .then(
         Self::ext(env::current_account_id())
-          .metadata(&mut meta1)
+          .with_unused_gas_weight(1)
+          .metadata(1)
       );
     log!("meta0: {}, meta1: {}", meta0.decimals, meta1.decimals);
 
@@ -100,8 +104,12 @@ impl ToyAMM {
   }
 
   #[private]
-  pub fn metadata(&self, meta: &mut FungibleTokenMetadata, #[callback] token_meta: FungibleTokenMetadata) {
-     *meta = token_meta;
+  pub fn metadata(&mut self, id: i32, #[callback_unwrap] token_meta: FungibleTokenMetadata) {
+    if id == 0 {
+      self.meta0 = token_meta;
+    } else {
+      self.meta1 = token_meta;
+    }
   }
 
   /**
